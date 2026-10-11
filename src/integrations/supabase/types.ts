@@ -14,16 +14,168 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      applications: {
+        Row: {
+          access_token_hash: string
+          age_group: string
+          consent: boolean
+          consent_at: string | null
+          created_at: string
+          current_status: string
+          device_access: string
+          experience: string
+          full_name: string
+          guardian_consent: boolean
+          guardian_name: string | null
+          guardian_phone: string | null
+          id: string
+          interests: string[]
+          ip_hash: string | null
+          lead_status: string
+          main_goal: string
+          notes: string | null
+          paid_at: string | null
+          payment_amount: number
+          payment_status: string
+          payment_verified_via: string | null
+          phone: string
+          practice_time: string
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          recommended_tier: string
+          selected_tier: string | null
+          updated_at: string
+          village: string
+          wants_advice: boolean
+        }
+        Insert: {
+          access_token_hash: string
+          age_group: string
+          consent?: boolean
+          consent_at?: string | null
+          created_at?: string
+          current_status: string
+          device_access: string
+          experience: string
+          full_name: string
+          guardian_consent?: boolean
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          id?: string
+          interests?: string[]
+          ip_hash?: string | null
+          lead_status?: string
+          main_goal: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_amount?: number
+          payment_status?: string
+          payment_verified_via?: string | null
+          phone: string
+          practice_time: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          recommended_tier: string
+          selected_tier?: string | null
+          updated_at?: string
+          village: string
+          wants_advice?: boolean
+        }
+        Update: {
+          access_token_hash?: string
+          age_group?: string
+          consent?: boolean
+          consent_at?: string | null
+          created_at?: string
+          current_status?: string
+          device_access?: string
+          experience?: string
+          full_name?: string
+          guardian_consent?: boolean
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          id?: string
+          interests?: string[]
+          ip_hash?: string | null
+          lead_status?: string
+          main_goal?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_amount?: number
+          payment_status?: string
+          payment_verified_via?: string | null
+          phone?: string
+          practice_time?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          recommended_tier?: string
+          selected_tier?: string | null
+          updated_at?: string
+          village?: string
+          wants_advice?: boolean
+        }
+        Relationships: []
+      }
+      payment_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          id: string
+          order_id: string | null
+          payment_id: string | null
+          received_at: string
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          id?: string
+          order_id?: string | null
+          payment_id?: string | null
+          received_at?: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          id?: string
+          order_id?: string | null
+          payment_id?: string | null
+          received_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +302,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin"],
+    },
   },
 } as const
