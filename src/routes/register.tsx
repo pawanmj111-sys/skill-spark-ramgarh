@@ -80,7 +80,7 @@ function Register() {
     } finally { setBusy(false); }
   }
 
-  const err = (k: string) => errors[k] && <p className="text-sm text-destructive">{errors[k]}</p>;
+  const err = (k: keyof typeof f) => errors[k] && <p className="text-sm text-destructive">{errors[k]}</p>;
 
   return (
     <div className="container-page max-w-3xl py-12">
