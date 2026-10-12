@@ -27,7 +27,7 @@ const FAQ = [
   ["Is there an age limit?", "No. We welcome learners of every age group. Students under 18 need a parent or guardian involved before enrollment and payment."],
   ["Will I definitely earn money online?", "No one can honestly guarantee income, clients or jobs. We teach practical skills and guide you through real projects and freelancing basics; results depend on your effort and the market."],
   ["Do I get a certificate?", "Yes, a certificate is provided on completing your course."],
-];
+] as const;
 
 function Landing() {
   return (
