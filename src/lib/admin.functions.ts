@@ -62,8 +62,15 @@ export const updateApplication = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { id, ...patch } = data;
-    const { error } = await context.supabase.from("applications").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+    const { id, lead_status, notes } = data;
+    const { error } = await context.supabase
+      .from("applications")
+      .update({
+        ...(lead_status !== undefined ? { lead_status } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
