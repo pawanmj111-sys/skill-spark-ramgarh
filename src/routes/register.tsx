@@ -23,7 +23,7 @@ export const Route = createFileRoute("/register")({
   component: Register,
 });
 
-function Radio({ label, name, options, value, onChange, error }: { label: string; name: string; options: readonly string[]; value: string; onChange: (v: string) => void; error?: string }) {
+function Radio({ label, name, options, value, onChange, error }: { label: string; name: string; options: readonly string[]; value: string; onChange: (v: string) => void; error?: string | undefined }) {
   return (
     <fieldset className="space-y-3">
       <legend className="font-semibold">{label}</legend>
@@ -46,13 +46,13 @@ function Register() {
     full_name: "", phone: "", village: "", age_group: "", current_status: "", device_access: "", experience: "",
     interests: [] as string[], main_goal: "", practice_time: "", consent: false, guardian_name: "", guardian_phone: "", guardian_consent: false, website: "",
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof f, string>>>({});
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f, v: any) => setF((p) => ({ ...p, [k]: v }));
   const minor = isMinor(f.age_group);
 
   function validate() {
-    const e: Record<string, string> = {};
+    const e: Partial<Record<keyof typeof f, string>> = {};
     if (f.full_name.trim().length < 2) e.full_name = "Enter your full name";
     if (!isValidIndianMobile(f.phone)) e.phone = "Enter a valid 10-digit mobile number";
     if (f.village.trim().length < 2) e.village = "Enter your village/town";
@@ -80,7 +80,7 @@ function Register() {
     } finally { setBusy(false); }
   }
 
-  const err = (k: string) => errors[k] && <p className="text-sm text-destructive">{errors[k]}</p>;
+  const err = (k: keyof typeof f) => errors[k] && <p className="text-sm text-destructive">{errors[k]}</p>;
 
   return (
     <div className="container-page max-w-3xl py-12">

@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIERS, type TierId } from "@/lib/academy";
 
-export function TierCard({ id, highlight, children, selected }: { id: TierId; highlight?: string; selected?: boolean; children?: React.ReactNode }) {
+export function TierCard({ id, highlight, children, selected }: { id: TierId; highlight?: string | undefined; selected?: boolean; children?: React.ReactNode }) {
   const t = TIERS[id];
   return (
     <div

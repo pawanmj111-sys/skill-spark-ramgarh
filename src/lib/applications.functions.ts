@@ -84,7 +84,7 @@ export const submitApplication = createServerFn({ method: "POST" })
         practice_time: data.practice_time,
         consent: true,
         consent_at: now,
-        guardian_name: minor ? data.guardian_name : null,
+        guardian_name: minor ? (data.guardian_name ?? null) : null,
         guardian_phone: minor && data.guardian_phone ? normalizePhone(data.guardian_phone) : null,
         guardian_consent: minor ? Boolean(data.guardian_consent) : false,
         recommended_tier: recommendTier(data),
