@@ -44,7 +44,7 @@ export const listApplications = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { data, error } = await context.supabase
       .from("applications")
-      .select("id,created_at,full_name,phone,village,age_group,current_status,device_access,experience,interests,main_goal,practice_time,consent,consent_at,guardian_name,guardian_phone,guardian_consent,recommended_tier,selected_tier,wants_advice,payment_status,payment_amount,razorpay_order_id,razorpay_payment_id,payment_verified_via,paid_at,lead_status,notes")
+      .select("id,created_at,full_name,phone,village,age_group,current_status,device_access,experience,interests,main_goal,practice_time,consent,consent_at,guardian_name,guardian_phone,guardian_consent,recommended_tier,selected_tier,wants_advice,payment_status,payment_amount,razorpay_order_id,razorpay_payment_id,payment_verified_via,paid_at,lead_status,notes,upi_ref,course_upi_ref,course_payment_status,course_amount,course_paid_at")
       .order("created_at", { ascending: false })
       .limit(2000);
     if (error) throw new Error(error.message);
@@ -71,6 +71,20 @@ export const updateApplication = createServerFn({ method: "POST" })
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const confirmUpiPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), kind: z.enum(["registration", "course"]), approve: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const now = new Date().toISOString();
+    const patch = data.kind === "registration"
+      ? (data.approve ? { payment_status: "paid", paid_at: now } : { payment_status: "failed" })
+      : (data.approve ? { course_payment_status: "paid", course_paid_at: now } : { course_payment_status: "failed" });
+    const { error } = await context.supabase.from("applications").update({ ...patch, updated_at: now }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

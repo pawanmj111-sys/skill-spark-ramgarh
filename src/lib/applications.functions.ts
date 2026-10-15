@@ -122,6 +122,8 @@ export const getMyApplication = createServerFn({ method: "POST" })
       course_payment_status: app.course_payment_status,
       course_payment_id: app.course_payment_id,
       course_amount: app.course_amount,
+      upi_ref: app.upi_ref,
+      course_upi_ref: app.course_upi_ref,
       payments: { configured: cfg.configured, testMode: cfg.testMode },
     };
   });
@@ -262,4 +264,25 @@ export const verifyCoursePayment = createServerFn({ method: "POST" })
     }
     await db.from("applications").update({ course_payment_status: "paid", course_payment_id: data.razorpay_payment_id, course_paid_at: now, updated_at: now }).eq("id", app.id).neq("course_payment_status", "paid");
     return { paid: true };
+  });
+
+// UPI (direct to academy UPI ID): student submits the 12-digit UTR; admin confirms manually.
+export const submitUpiRef = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    accessSchema.extend({ kind: z.enum(["registration", "course"]), utr: z.string().trim().regex(/^\d{12}$/, "Enter the 12-digit UPI reference (UTR) number") }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { db, app } = await loadWithToken(data.id, data.token);
+    const now = new Date().toISOString();
+    if (data.kind === "registration") {
+      if (app.payment_status === "paid") return { ok: true };
+      await db.from("applications").update({ upi_ref: data.utr, payment_status: "verifying", payment_verified_via: "upi", updated_at: now }).eq("id", app.id);
+    } else {
+      if (app.payment_status !== "paid") throw new Error("Registration payment must be confirmed first.");
+      if (!app.selected_tier || !TIER_PRICE[app.selected_tier]) throw new Error("Please choose a course first.");
+      if (app.course_payment_status === "paid") return { ok: true };
+      const amount = ((TIER_PRICE[app.selected_tier] ?? 0) - ACADEMY.registrationFeeINR) * 100;
+      await db.from("applications").update({ course_upi_ref: data.utr, course_amount: amount, course_payment_status: "verifying", updated_at: now }).eq("id", app.id);
+    }
+    return { ok: true };
   });
