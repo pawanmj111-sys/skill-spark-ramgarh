@@ -20,6 +20,11 @@ export type Database = {
           age_group: string
           consent: boolean
           consent_at: string | null
+          course_amount: number | null
+          course_order_id: string | null
+          course_paid_at: string | null
+          course_payment_id: string | null
+          course_payment_status: string
           created_at: string
           current_status: string
           device_access: string
@@ -53,6 +58,11 @@ export type Database = {
           age_group: string
           consent?: boolean
           consent_at?: string | null
+          course_amount?: number | null
+          course_order_id?: string | null
+          course_paid_at?: string | null
+          course_payment_id?: string | null
+          course_payment_status?: string
           created_at?: string
           current_status: string
           device_access: string
@@ -86,6 +96,11 @@ export type Database = {
           age_group?: string
           consent?: boolean
           consent_at?: string | null
+          course_amount?: number | null
+          course_order_id?: string | null
+          course_paid_at?: string | null
+          course_payment_id?: string | null
+          course_payment_status?: string
           created_at?: string
           current_status?: string
           device_access?: string
