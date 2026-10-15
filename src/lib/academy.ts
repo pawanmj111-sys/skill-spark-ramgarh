@@ -8,6 +8,8 @@ export const ACADEMY = {
   address: "Atna, Banker, Chainpur, Ramgarh, Jharkhand – 829134",
   registrationFeeINR: 149,
   registrationFeePaise: 14900,
+  upiId: "pawanmj111-1@okicici",
+  upiName: "Pawan Kumar",
 } as const;
 
 export type TierId = "basic" | "moderate" | "advance";

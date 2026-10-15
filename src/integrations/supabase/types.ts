@@ -25,6 +25,7 @@ export type Database = {
           course_paid_at: string | null
           course_payment_id: string | null
           course_payment_status: string
+          course_upi_ref: string | null
           created_at: string
           current_status: string
           device_access: string
@@ -50,6 +51,7 @@ export type Database = {
           recommended_tier: string
           selected_tier: string | null
           updated_at: string
+          upi_ref: string | null
           village: string
           wants_advice: boolean
         }
@@ -63,6 +65,7 @@ export type Database = {
           course_paid_at?: string | null
           course_payment_id?: string | null
           course_payment_status?: string
+          course_upi_ref?: string | null
           created_at?: string
           current_status: string
           device_access: string
@@ -88,6 +91,7 @@ export type Database = {
           recommended_tier: string
           selected_tier?: string | null
           updated_at?: string
+          upi_ref?: string | null
           village: string
           wants_advice?: boolean
         }
@@ -101,6 +105,7 @@ export type Database = {
           course_paid_at?: string | null
           course_payment_id?: string | null
           course_payment_status?: string
+          course_upi_ref?: string | null
           created_at?: string
           current_status?: string
           device_access?: string
@@ -126,6 +131,7 @@ export type Database = {
           recommended_tier?: string
           selected_tier?: string | null
           updated_at?: string
+          upi_ref?: string | null
           village?: string
           wants_advice?: boolean
         }
