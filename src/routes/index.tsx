@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
 
 const FAQ = [
   ["Are the course fees monthly?", "Yes. Basic is ₹499/month, Moderate ₹699/month and Advance ₹799/month. The fee is charged per month of learning."],
-  ["What is the ₹149 registration fee?", "It is a one-time registration fee paid once when you register. It is separate from — and not included in — your first month's course fee."],
+  ["What is the ₹149 registration fee?", "It is paid once when you register and is adjusted in your first month's course fee. Example: Basic is ₹499, so after ₹149 you pay the remaining ₹350."],
   ["I have never used a computer. Can I join?", "Yes. The Basic course starts from zero, and you can practise on academy computers if you don't have a laptop."],
   ["Is there an age limit?", "No. We welcome learners of every age group. Students under 18 need a parent or guardian involved before enrollment and payment."],
   ["Will I definitely earn money online?", "No one can honestly guarantee income, clients or jobs. We teach practical skills and guide you through real projects and freelancing basics; results depend on your effort and the market."],
@@ -48,7 +48,7 @@ function Landing() {
               <Button asChild variant="hero" size="lg"><Link to="/register">Find My Course</Link></Button>
               <Button asChild variant="heroOutline" size="lg"><Link to="/register">Register Now</Link></Button>
             </div>
-            <p className="mt-4 text-sm text-navy-foreground/60">Courses from ₹499/month · ₹149 one-time registration</p>
+            <p className="mt-4 text-sm text-navy-foreground/60">Courses from ₹499/month · register with ₹149 (adjusted in first month)</p>
           </div>
           <div className="animate-rise [animation-delay:150ms]">
             <img src={hero} alt="Learners practising on computers with an instructor at a local classroom" width={1600} height={1104} className="aspect-[4/3] w-full rounded-3xl object-cover shadow-2xl ring-1 ring-navy-foreground/10" />
@@ -76,7 +76,7 @@ function Landing() {
         <div className="container-page">
           <h2 className="text-3xl font-bold md:text-4xl">Courses & monthly fees</h2>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            All course fees are <strong className="text-foreground">per month</strong>. The <strong className="text-foreground">₹149 registration fee is one-time and separate</strong> — it is not part of your first month's fee.
+            All course fees are <strong className="text-foreground">per month</strong>. The <strong className="text-foreground">₹149 registration fee is adjusted in your first month</strong> — e.g. Basic: ₹149 now + ₹350 remaining.
           </p>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             <TierCard id="basic" />

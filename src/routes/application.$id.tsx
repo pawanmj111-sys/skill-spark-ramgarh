@@ -166,9 +166,9 @@ function AppPage() {
         <h2 className="text-xl font-bold">Fee summary</h2>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between"><dt>Course fee (monthly){selected ? ` — ${TIERS[selected].name}` : ""}</dt><dd>{fee ? `₹${fee}/month` : "Choose a course"}</dd></div>
-          <div className="flex justify-between"><dt>Registration fee (one-time, separate)</dt><dd>₹149</dd></div>
+          <div className="flex justify-between"><dt>Pay now: registration (adjusted in first month)</dt><dd>₹149</dd></div><div className="flex justify-between"><dt>Remaining for first month</dt><dd>{fee ? `₹${fee - 149}` : "—"}</dd></div>
         </dl>
-        <p className="mt-3 text-xs text-muted-foreground">Pay now: only the ₹149 registration fee. It does not include your first month's course fee.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Pay ₹149 now; it is deducted from your first month. You pay the remaining balance next.</p>
         {isMinor(app.age_group) && <p className="mt-3 rounded-lg bg-highlight/15 p-3 text-sm">Under 18: please make this payment with your parent/guardian present.</p>}
         {!app.payments.configured ? (
           <div className="mt-5 flex gap-2 rounded-lg border border-dashed p-3 text-sm"><AlertTriangle className="size-5 shrink-0 text-highlight-foreground" />Payments setup pending. Your registration is saved; the academy will contact you about payment.</div>

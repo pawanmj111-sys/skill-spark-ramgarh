@@ -20,7 +20,7 @@ export function TierCard({ id, highlight, children, selected }: { id: TierId; hi
       <p className="mt-5 font-display text-4xl font-extrabold">
         ₹{t.price}<span className="text-base font-medium text-muted-foreground">/month</span>
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">+ ₹149 one-time registration fee (separate)</p>
+      <p className="mt-1 text-xs text-muted-foreground">₹149 registration is adjusted in your first month</p>
       <ul className="mt-5 flex-1 space-y-2.5 text-sm">
         {t.topics.map((x) => (
           <li key={x} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" />{x}</li>
