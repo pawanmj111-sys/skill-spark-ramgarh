@@ -7,7 +7,7 @@ import { CheckCircle2, Loader2, AlertTriangle, MessageCircle } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { TierCard } from "@/components/tier-card";
 import { ACADEMY, TIERS, isMinor, recommendationReason, supportiveGuidance, type TierId } from "@/lib/academy";
-import { chooseCourse, createPaymentOrder, getMyApplication, markPaymentFailed, verifyPayment } from "@/lib/applications.functions";
+import { chooseCourse, createCourseOrder, createPaymentOrder, getMyApplication, markPaymentFailed, verifyCoursePayment, verifyPayment } from "@/lib/applications.functions";
 
 export const Route = createFileRoute("/application/$id")({
   validateSearch: z.object({ t: z.string().default("") }),
@@ -32,6 +32,7 @@ function AppPage() {
   const { id } = Route.useParams();
   const { t } = Route.useSearch();
   const get = useServerFn(getMyApplication), choose = useServerFn(chooseCourse), order = useServerFn(createPaymentOrder), verify = useServerFn(verifyPayment), fail = useServerFn(markPaymentFailed);
+  const courseOrder = useServerFn(createCourseOrder), verifyCourse = useServerFn(verifyCoursePayment);
   const [app, setApp] = useState<Awaited<ReturnType<typeof getMyApplication>> | null>(null);
   const [error, setError] = useState("");
   const [paying, setPaying] = useState(false);
@@ -80,13 +81,60 @@ function AppPage() {
     setPaying(false);
   }
 
+  async function payCourse() {
+    setPaying(true); setPayMsg("");
+    try {
+      const o = await courseOrder({ data: { id, token: t } });
+      if (o.status === "already_paid") { await load(); return; }
+      if (o.status === "not_configured") { setPayMsg("Online payment isn't active yet — the academy will contact you about the course fee."); return; }
+      if (!(await loadRzp())) throw new Error("Could not load Razorpay checkout. Check your internet and retry.");
+      const rzp = new window.Razorpay({
+        key: o.keyId, order_id: o.orderId, amount: o.amount, currency: "INR",
+        name: "AI Skill Academy", description: "First month course fee (balance)",
+        prefill: { name: o.name, contact: o.phone }, theme: { color: "#2b4fd8" },
+        handler: async (r: any) => {
+          setPayMsg("Verifying payment…");
+          try {
+            const v = await verifyCourse({ data: { id, token: t, ...r } });
+            setPayMsg(v.paid ? "" : "Payment could not be verified. Please contact the academy.");
+          } catch { setPayMsg("Verification failed. Please contact the academy."); }
+          await load(); setPaying(false);
+        },
+        modal: { ondismiss: () => { setPayMsg("Payment cancelled. You can retry anytime."); setPaying(false); } },
+      });
+      rzp.on("payment.failed", () => setPayMsg("Payment failed. Please try again."));
+      rzp.open();
+      return;
+    } catch (e: any) { setPayMsg(e?.message ?? "Payment error"); }
+    setPaying(false);
+  }
+
   if (app.payment_status === "paid") {
+    const balance = selected ? TIERS[selected].price - ACADEMY.registrationFeeINR : null;
+    const coursePaid = app.course_payment_status === "paid";
     return (
       <div className="container-page max-w-xl py-20 text-center">
         <CheckCircle2 className="mx-auto size-16 text-success" />
-        <h1 className="mt-4 text-3xl font-bold">Registration confirmed</h1>
-        <p className="mt-2 text-muted-foreground">Thank you, {app.full_name}. Your ₹149 registration fee is received{app.razorpay_payment_id ? ` (ref ${app.razorpay_payment_id})` : ""}. The academy will call you to confirm your batch.</p>
-        {selected && <p className="mt-4">Selected course: <strong>{TIERS[selected].name}</strong> — ₹{TIERS[selected].price}/month (paid monthly, separately).</p>}
+        <h1 className="mt-4 text-3xl font-bold">{coursePaid ? "First month fully paid" : "Registration confirmed"}</h1>
+        <p className="mt-2 text-muted-foreground">Thank you, {app.full_name}. ₹149 received{app.razorpay_payment_id ? ` (ref ${app.razorpay_payment_id})` : ""} and adjusted in your first month's fee.</p>
+        {coursePaid ? (
+          <p className="mt-4">Balance ₹{(app.course_amount ?? 0) / 100} paid{app.course_payment_id ? ` (ref ${app.course_payment_id})` : ""}. The academy will call you to confirm your batch.</p>
+        ) : selected && balance ? (
+          <div className="mt-6 rounded-2xl border bg-card p-6 text-left shadow-card">
+            <h2 className="text-lg font-bold">{TIERS[selected].name} — first month</h2>
+            <dl className="mt-3 space-y-1 text-sm">
+              <div className="flex justify-between"><dt>Course fee</dt><dd>₹{TIERS[selected].price}</dd></div>
+              <div className="flex justify-between"><dt>Registration already paid</dt><dd>− ₹149</dd></div>
+              <div className="flex justify-between font-bold"><dt>Remaining to pay</dt><dd>₹{balance}</dd></div>
+            </dl>
+            {app.payments.configured
+              ? <Button className="mt-4 w-full" size="lg" onClick={payCourse} disabled={paying}>{paying && <Loader2 className="animate-spin" />}Pay remaining ₹{balance}</Button>
+              : <p className="mt-4 text-sm text-muted-foreground">Online payment isn't active yet — you can also pay at the academy.</p>}
+            {payMsg && <p className="mt-3 text-sm" role="status">{payMsg}</p>}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm">The academy will help you choose a course and pay the remaining fee.</p>
+        )}
       </div>
     );
   }
@@ -118,9 +166,9 @@ function AppPage() {
         <h2 className="text-xl font-bold">Fee summary</h2>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between"><dt>Course fee (monthly){selected ? ` — ${TIERS[selected].name}` : ""}</dt><dd>{fee ? `₹${fee}/month` : "Choose a course"}</dd></div>
-          <div className="flex justify-between"><dt>Registration fee (one-time, separate)</dt><dd>₹149</dd></div>
+          <div className="flex justify-between"><dt>Pay now: registration (adjusted in first month)</dt><dd>₹149</dd></div><div className="flex justify-between"><dt>Remaining for first month</dt><dd>{fee ? `₹${fee - 149}` : "—"}</dd></div>
         </dl>
-        <p className="mt-3 text-xs text-muted-foreground">Pay now: only the ₹149 registration fee. It does not include your first month's course fee.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Pay ₹149 now; it is deducted from your first month. You pay the remaining balance next.</p>
         {isMinor(app.age_group) && <p className="mt-3 rounded-lg bg-highlight/15 p-3 text-sm">Under 18: please make this payment with your parent/guardian present.</p>}
         {!app.payments.configured ? (
           <div className="mt-5 flex gap-2 rounded-lg border border-dashed p-3 text-sm"><AlertTriangle className="size-5 shrink-0 text-highlight-foreground" />Payments setup pending. Your registration is saved; the academy will contact you about payment.</div>

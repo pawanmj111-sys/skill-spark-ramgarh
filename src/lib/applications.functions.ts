@@ -119,6 +119,9 @@ export const getMyApplication = createServerFn({ method: "POST" })
       payment_status: app.payment_status,
       paid_at: app.paid_at,
       razorpay_payment_id: app.razorpay_payment_id,
+      course_payment_status: app.course_payment_status,
+      course_payment_id: app.course_payment_id,
+      course_amount: app.course_amount,
       payments: { configured: cfg.configured, testMode: cfg.testMode },
     };
   });
@@ -210,4 +213,53 @@ export const markPaymentFailed = createServerFn({ method: "POST" })
     const { db } = await loadWithToken(data.id, data.token);
     await db.from("applications").update({ payment_status: "failed", updated_at: new Date().toISOString() }).eq("id", data.id).neq("payment_status", "paid");
     return { ok: true };
+  });
+
+// First-month course fee: tier price minus the ₹149 already paid at registration.
+const TIER_PRICE: Record<string, number> = { basic: 499, moderate: 699, advance: 799 };
+
+export const createCourseOrder = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => accessSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { db, app } = await loadWithToken(data.id, data.token);
+    if (app.payment_status !== "paid") throw new Error("Please pay the ₹149 registration fee first.");
+    if (app.course_payment_status === "paid") return { status: "already_paid" as const };
+    if (!app.selected_tier || !TIER_PRICE[app.selected_tier]) throw new Error("Please choose a course first.");
+    const cfg = razorpayConfig();
+    if (!cfg.configured) return { status: "not_configured" as const };
+    const amount = ((TIER_PRICE[app.selected_tier] ?? 0) - ACADEMY.registrationFeeINR) * 100;
+    const res = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Basic " + btoa(`${cfg.keyId}:${cfg.keySecret}`) },
+      body: JSON.stringify({ amount, currency: "INR", receipt: `crs_${app.id.slice(0, 30)}`, notes: { application_id: app.id, purpose: "first_month_course", tier: app.selected_tier } }),
+    });
+    if (!res.ok) { console.error("Razorpay course order error", res.status, await res.text()); throw new Error("Payment service is unavailable right now."); }
+    const order = (await res.json()) as { id: string; amount: number };
+    if (order.amount !== amount) throw new Error("Unexpected order amount");
+    await db.from("applications").update({ course_order_id: order.id, course_amount: amount, course_payment_status: "pending", updated_at: new Date().toISOString() }).eq("id", app.id);
+    return { status: "created" as const, orderId: order.id, amount, keyId: cfg.keyId!, name: app.full_name, phone: app.phone };
+  });
+
+export const verifyCoursePayment = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    accessSchema.extend({
+      razorpay_order_id: z.string().min(5).max(60),
+      razorpay_payment_id: z.string().min(5).max(60),
+      razorpay_signature: z.string().regex(/^[a-f0-9]{64}$/),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { db, app } = await loadWithToken(data.id, data.token);
+    const cfg = razorpayConfig();
+    if (!cfg.configured) throw new Error("Payments are not configured");
+    if (app.course_payment_status === "paid") return { paid: true };
+    if (app.course_order_id !== data.razorpay_order_id) throw new Error("Order does not match");
+    const expected = await hmacSha256Hex(cfg.keySecret!, `${data.razorpay_order_id}|${data.razorpay_payment_id}`);
+    const now = new Date().toISOString();
+    if (!timingSafeEqual(expected, data.razorpay_signature)) {
+      await db.from("applications").update({ course_payment_status: "failed", updated_at: now }).eq("id", app.id).neq("course_payment_status", "paid");
+      return { paid: false };
+    }
+    await db.from("applications").update({ course_payment_status: "paid", course_payment_id: data.razorpay_payment_id, course_paid_at: now, updated_at: now }).eq("id", app.id).neq("course_payment_status", "paid");
+    return { paid: true };
   });

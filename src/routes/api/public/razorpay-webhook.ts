@@ -32,13 +32,21 @@ export const Route = createFileRoute("/api/public/razorpay-webhook")({
         if (!orderId) return Response.json({ ok: true });
 
         const now = new Date().toISOString();
-        if ((evt.event === "payment.captured" || evt.event === "order.paid") && payment?.amount === 14900 && payment?.currency === "INR") {
+        const captured = evt.event === "payment.captured" || evt.event === "order.paid";
+        if (captured && payment?.amount === 14900 && payment?.currency === "INR") {
           await supabaseAdmin.from("applications").update({
             payment_status: "paid", razorpay_payment_id: payment.id, payment_verified_via: "webhook", paid_at: now, updated_at: now,
           }).eq("razorpay_order_id", orderId).neq("payment_status", "paid");
         } else if (evt.event === "payment.failed") {
           await supabaseAdmin.from("applications").update({ payment_status: "failed", updated_at: now })
             .eq("razorpay_order_id", orderId).neq("payment_status", "paid");
+          await supabaseAdmin.from("applications").update({ course_payment_status: "failed", updated_at: now })
+            .eq("course_order_id", orderId).neq("course_payment_status", "paid");
+        }
+        if (captured && payment?.currency === "INR" && typeof payment?.amount === "number") {
+          await supabaseAdmin.from("applications").update({
+            course_payment_status: "paid", course_payment_id: payment.id, course_paid_at: now, updated_at: now,
+          }).eq("course_order_id", orderId).eq("course_amount", payment.amount).neq("course_payment_status", "paid");
         }
         return Response.json({ ok: true });
       },
