@@ -227,7 +227,7 @@ export const createCourseOrder = createServerFn({ method: "POST" })
     if (!app.selected_tier || !TIER_PRICE[app.selected_tier]) throw new Error("Please choose a course first.");
     const cfg = razorpayConfig();
     if (!cfg.configured) return { status: "not_configured" as const };
-    const amount = (TIER_PRICE[app.selected_tier] - ACADEMY.registrationFeeINR) * 100;
+    const amount = ((TIER_PRICE[app.selected_tier] ?? 0) - ACADEMY.registrationFeeINR) * 100;
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Basic " + btoa(`${cfg.keyId}:${cfg.keySecret}`) },
