@@ -1,0 +1,1 @@
+ALTER TABLE public.applications ADD COLUMN upi_ref text, ADD COLUMN course_upi_ref text;
