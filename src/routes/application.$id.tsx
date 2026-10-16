@@ -3,40 +3,35 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, AlertTriangle, MessageCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TierCard } from "@/components/tier-card";
+import { UpiPay } from "@/components/upi-pay";
 import { ACADEMY, TIERS, isMinor, recommendationReason, supportiveGuidance, type TierId } from "@/lib/academy";
-import { chooseCourse, createCourseOrder, createPaymentOrder, getMyApplication, markPaymentFailed, verifyCoursePayment, verifyPayment } from "@/lib/applications.functions";
+import { chooseCourse, getMyApplication, submitUpiRef } from "@/lib/applications.functions";
 
 export const Route = createFileRoute("/application/$id")({
   validateSearch: z.object({ t: z.string().default("") }),
-  head: () => ({ meta: [{ title: "Your recommendation — AI Skill Academy" }, { name: "robots", content: "noindex" }, { name: "description", content: "Your course recommendation and registration payment." }] }),
+  head: () => ({ meta: [{ title: "Your recommendation — AI Skill Academy" }, { name: "robots", content: "noindex" }, { name: "description", content: "Your course recommendation and UPI payment." }] }),
   ssr: false,
   component: AppPage,
 });
 
-declare global { interface Window { Razorpay?: any } }
-
-function loadRzp() {
-  return new Promise<boolean>((res) => {
-    if (window.Razorpay) return res(true);
-    const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload = () => res(true); s.onerror = () => res(false);
-    document.body.appendChild(s);
-  });
+function Waiting({ utr }: { utr?: string | null }) {
+  return (
+    <div className="mt-4 flex gap-2 rounded-lg border border-dashed p-3 text-left text-sm">
+      <Clock className="size-5 shrink-0 text-primary" />
+      <span>Payment submitted{utr ? ` (UTR ${utr})` : ""}. The academy is checking it and will confirm soon. Wrong number? Call {ACADEMY.phone ?? "the academy"}.</span>
+    </div>
+  );
 }
 
 function AppPage() {
   const { id } = Route.useParams();
   const { t } = Route.useSearch();
-  const get = useServerFn(getMyApplication), choose = useServerFn(chooseCourse), order = useServerFn(createPaymentOrder), verify = useServerFn(verifyPayment), fail = useServerFn(markPaymentFailed);
-  const courseOrder = useServerFn(createCourseOrder), verifyCourse = useServerFn(verifyCoursePayment);
+  const get = useServerFn(getMyApplication), choose = useServerFn(chooseCourse), upi = useServerFn(submitUpiRef);
   const [app, setApp] = useState<Awaited<ReturnType<typeof getMyApplication>> | null>(null);
   const [error, setError] = useState("");
-  const [paying, setPaying] = useState(false);
-  const [payMsg, setPayMsg] = useState("");
 
   const load = useCallback(() => get({ data: { id, token: t } }).then(setApp).catch(() => setError("We couldn't find this registration link.")), [id, t]);
   useEffect(() => { load(); }, [load]);
@@ -46,91 +41,43 @@ function AppPage() {
 
   const rec = app.recommended_tier as TierId;
   const selected = (app.selected_tier ?? null) as TierId | null;
+  const fee = selected ? TIERS[selected].price : null;
+  const balance = fee ? fee - ACADEMY.registrationFeeINR : null;
 
   async function pick(tier: TierId | null, advice = false) {
     await choose({ data: { id, token: t, tier, wants_advice: advice } });
     await load();
     toast.success(advice ? "Noted — the academy will advise you." : `${TIERS[tier!].name} selected`);
   }
-
-  async function pay() {
-    setPaying(true); setPayMsg("");
-    try {
-      const o = await order({ data: { id, token: t } });
-      if (o.status === "already_paid") { await load(); return; }
-      if (o.status === "not_configured") { setPayMsg("Payments setup pending. Online payment isn't active yet — your registration is saved and the academy will contact you."); return; }
-      if (!(await loadRzp())) throw new Error("Could not load Razorpay checkout. Check your internet and retry.");
-      const rzp = new window.Razorpay({
-        key: o.keyId, order_id: o.orderId, amount: o.amount, currency: "INR",
-        name: "AI Skill Academy", description: "One-time registration fee",
-        prefill: { name: o.name, contact: o.phone }, theme: { color: "#2b4fd8" },
-        handler: async (r: any) => {
-          setPayMsg("Verifying payment…");
-          try {
-            const v = await verify({ data: { id, token: t, ...r } });
-            setPayMsg(v.paid ? "" : "Payment could not be verified. If money was deducted, it will be confirmed automatically or refunded — please contact the academy.");
-          } catch { setPayMsg("Verification failed. Please retry or contact the academy."); }
-          await load(); setPaying(false);
-        },
-        modal: { ondismiss: () => { setPayMsg("Payment cancelled. You can retry anytime."); setPaying(false); } },
-      });
-      rzp.on("payment.failed", () => { fail({ data: { id, token: t } }); setPayMsg("Payment failed. Please try again."); });
-      rzp.open();
-      return;
-    } catch (e: any) { setPayMsg(e?.message ?? "Payment error"); }
-    setPaying(false);
-  }
-
-  async function payCourse() {
-    setPaying(true); setPayMsg("");
-    try {
-      const o = await courseOrder({ data: { id, token: t } });
-      if (o.status === "already_paid") { await load(); return; }
-      if (o.status === "not_configured") { setPayMsg("Online payment isn't active yet — the academy will contact you about the course fee."); return; }
-      if (!(await loadRzp())) throw new Error("Could not load Razorpay checkout. Check your internet and retry.");
-      const rzp = new window.Razorpay({
-        key: o.keyId, order_id: o.orderId, amount: o.amount, currency: "INR",
-        name: "AI Skill Academy", description: "First month course fee (balance)",
-        prefill: { name: o.name, contact: o.phone }, theme: { color: "#2b4fd8" },
-        handler: async (r: any) => {
-          setPayMsg("Verifying payment…");
-          try {
-            const v = await verifyCourse({ data: { id, token: t, ...r } });
-            setPayMsg(v.paid ? "" : "Payment could not be verified. Please contact the academy.");
-          } catch { setPayMsg("Verification failed. Please contact the academy."); }
-          await load(); setPaying(false);
-        },
-        modal: { ondismiss: () => { setPayMsg("Payment cancelled. You can retry anytime."); setPaying(false); } },
-      });
-      rzp.on("payment.failed", () => setPayMsg("Payment failed. Please try again."));
-      rzp.open();
-      return;
-    } catch (e: any) { setPayMsg(e?.message ?? "Payment error"); }
-    setPaying(false);
+  async function send(kind: "registration" | "course", utr: string) {
+    await upi({ data: { id, token: t, kind, utr } });
+    toast.success("Payment reference submitted");
+    await load();
   }
 
   if (app.payment_status === "paid") {
-    const balance = selected ? TIERS[selected].price - ACADEMY.registrationFeeINR : null;
     const coursePaid = app.course_payment_status === "paid";
     return (
       <div className="container-page max-w-xl py-20 text-center">
         <CheckCircle2 className="mx-auto size-16 text-success" />
         <h1 className="mt-4 text-3xl font-bold">{coursePaid ? "First month fully paid" : "Registration confirmed"}</h1>
-        <p className="mt-2 text-muted-foreground">Thank you, {app.full_name}. ₹149 received{app.razorpay_payment_id ? ` (ref ${app.razorpay_payment_id})` : ""} and adjusted in your first month's fee.</p>
+        <p className="mt-2 text-muted-foreground">Thank you, {app.full_name}. ₹149 received and adjusted in your first month's fee.</p>
         {coursePaid ? (
-          <p className="mt-4">Balance ₹{(app.course_amount ?? 0) / 100} paid{app.course_payment_id ? ` (ref ${app.course_payment_id})` : ""}. The academy will call you to confirm your batch.</p>
+          <p className="mt-4">Remaining ₹{(app.course_amount ?? 0) / 100} received. The academy will call you to confirm your batch.</p>
         ) : selected && balance ? (
           <div className="mt-6 rounded-2xl border bg-card p-6 text-left shadow-card">
             <h2 className="text-lg font-bold">{TIERS[selected].name} — first month</h2>
             <dl className="mt-3 space-y-1 text-sm">
-              <div className="flex justify-between"><dt>Course fee</dt><dd>₹{TIERS[selected].price}</dd></div>
+              <div className="flex justify-between"><dt>Course fee</dt><dd>₹{fee}</dd></div>
               <div className="flex justify-between"><dt>Registration already paid</dt><dd>− ₹149</dd></div>
               <div className="flex justify-between font-bold"><dt>Remaining to pay</dt><dd>₹{balance}</dd></div>
             </dl>
-            {app.payments.configured
-              ? <Button className="mt-4 w-full" size="lg" onClick={payCourse} disabled={paying}>{paying && <Loader2 className="animate-spin" />}Pay remaining ₹{balance}</Button>
-              : <p className="mt-4 text-sm text-muted-foreground">Online payment isn't active yet — you can also pay at the academy.</p>}
-            {payMsg && <p className="mt-3 text-sm" role="status">{payMsg}</p>}
+            {app.course_payment_status === "verifying"
+              ? <Waiting utr={app.course_upi_ref} />
+              : <>
+                  {app.course_payment_status === "failed" && <p className="mt-3 text-sm text-destructive">We couldn't confirm your last payment. Please check and submit again.</p>}
+                  <UpiPay amount={balance} note={`AISA course ${app.id.slice(0, 8)}`} onSubmit={(u) => send("course", u)} />
+                </>}
           </div>
         ) : (
           <p className="mt-4 text-sm">The academy will help you choose a course and pay the remaining fee.</p>
@@ -140,7 +87,6 @@ function AppPage() {
   }
 
   const tips = supportiveGuidance(app);
-  const fee = selected ? TIERS[selected].price : null;
 
   return (
     <div className="container-page py-12">
@@ -166,19 +112,16 @@ function AppPage() {
         <h2 className="text-xl font-bold">Fee summary</h2>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between"><dt>Course fee (monthly){selected ? ` — ${TIERS[selected].name}` : ""}</dt><dd>{fee ? `₹${fee}/month` : "Choose a course"}</dd></div>
-          <div className="flex justify-between"><dt>Pay now: registration (adjusted in first month)</dt><dd>₹149</dd></div><div className="flex justify-between"><dt>Remaining for first month</dt><dd>{fee ? `₹${fee - 149}` : "—"}</dd></div>
+          <div className="flex justify-between"><dt>Pay now: registration (adjusted in first month)</dt><dd>₹149</dd></div>
+          <div className="flex justify-between"><dt>Remaining for first month</dt><dd>{balance ? `₹${balance}` : "—"}</dd></div>
         </dl>
-        <p className="mt-3 text-xs text-muted-foreground">Pay ₹149 now; it is deducted from your first month. You pay the remaining balance next.</p>
         {isMinor(app.age_group) && <p className="mt-3 rounded-lg bg-highlight/15 p-3 text-sm">Under 18: please make this payment with your parent/guardian present.</p>}
-        {!app.payments.configured ? (
-          <div className="mt-5 flex gap-2 rounded-lg border border-dashed p-3 text-sm"><AlertTriangle className="size-5 shrink-0 text-highlight-foreground" />Payments setup pending. Your registration is saved; the academy will contact you about payment.</div>
-        ) : (
-          <>
-            {app.payments.testMode && <p className="mt-4 text-xs font-semibold text-primary">TEST MODE — no real money is charged.</p>}
-            <Button className="mt-4 w-full" size="lg" onClick={pay} disabled={paying}>{paying && <Loader2 className="animate-spin" />}{app.payment_status === "failed" ? "Retry payment of ₹149" : "Pay ₹149 registration fee"}</Button>
-          </>
-        )}
-        {payMsg && <p className="mt-3 text-sm" role="status">{payMsg}</p>}
+        {app.payment_status === "verifying"
+          ? <Waiting utr={app.upi_ref} />
+          : <>
+              {app.payment_status === "failed" && <p className="mt-3 text-sm text-destructive">We couldn't confirm your last payment. Please check and submit again.</p>}
+              <UpiPay amount={ACADEMY.registrationFeeINR} note={`AISA reg ${app.id.slice(0, 8)}`} onSubmit={(u) => send("registration", u)} />
+            </>}
       </div>
     </div>
   );
