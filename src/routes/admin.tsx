@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { claimAdmin, getAdminStatus, listApplications, updateApplication } from "@/lib/admin.functions";
+import { claimAdmin, confirmUpiPayment, getAdminStatus, listApplications, updateApplication } from "@/lib/admin.functions";
 import { LEAD_STATUSES, TIERS, type TierId } from "@/lib/academy";
 
 export const Route = createFileRoute("/admin")({
@@ -30,7 +30,8 @@ const sel = "h-9 rounded-md border bg-card px-2 text-sm";
 
 function Admin() {
   const nav = useNavigate();
-  const status = useServerFn(getAdminStatus), claim = useServerFn(claimAdmin), list = useServerFn(listApplications), upd = useServerFn(updateApplication);
+  const status = useServerFn(getAdminStatus), claim = useServerFn(claimAdmin), list = useServerFn(listApplications), upd = useServerFn(updateApplication), confirmUpi = useServerFn(confirmUpiPayment);
+  async function decide(kind: "registration" | "course", approve: boolean) { if (!open) return; await confirmUpi({ data: { id: open.id, kind, approve } }); toast.success(approve ? "Payment confirmed" : "Marked not received"); const r = await list(); setRows(r); setOpen(r.find((x) => x.id === open.id) ?? null); }
   const [st, setSt] = useState<Awaited<ReturnType<typeof getAdminStatus>> | null>(null);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [q, setQ] = useState(""); const [course, setCourse] = useState(""); const [pay, setPay] = useState(""); const [lead, setLead] = useState(""); const [from, setFrom] = useState(""); const [to, setTo] = useState("");
@@ -101,7 +102,7 @@ function Admin() {
       <div className="mt-6 flex flex-wrap gap-2">
         <Input placeholder="Search name, phone, village" value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />
         <select className={sel} value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Course"><option value="">All courses</option>{Object.values(TIERS).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-        <select className={sel} value={pay} onChange={(e) => setPay(e.target.value)} aria-label="Payment"><option value="">All payments</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="failed">Failed</option></select>
+        <select className={sel} value={pay} onChange={(e) => setPay(e.target.value)} aria-label="Payment"><option value="">All payments</option><option value="pending">Pending</option><option value="verifying">UPI to check</option><option value="paid">Paid</option><option value="failed">Failed</option></select>
         <select className={sel} value={lead} onChange={(e) => setLead(e.target.value)} aria-label="Lead status"><option value="">All leads</option>{LEAD_STATUSES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
         <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" aria-label="From" />
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" aria-label="To" />
@@ -127,8 +128,10 @@ function Admin() {
           {open && <>
             <DialogHeader><DialogTitle>{open.full_name}</DialogTitle></DialogHeader>
             <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-              {([["Phone", open.phone], ["Village/Town", open.village], ["Age group", open.age_group], ["Status", open.current_status], ["Device", open.device_access], ["Experience", open.experience], ["Interests", open.interests.join(", ")], ["Goal", open.main_goal], ["Practice", open.practice_time], ["Guardian", open.guardian_name ? `${open.guardian_name} (${open.guardian_phone})` : "—"], ["Recommended", tierName(open.recommended_tier)], ["Selected", tierName(open.selected_tier)], ["Wants advice", open.wants_advice ? "Yes" : "No"], ["Consent", open.consent ? `Yes, ${new Date(open.consent_at!).toLocaleString("en-IN")}` : "No"], ["Payment", `${open.payment_status}${open.payment_verified_via ? ` (via ${open.payment_verified_via})` : ""}`], ["Order ID", open.razorpay_order_id ?? "—"], ["Payment ID", open.razorpay_payment_id ?? "—"], ["Paid at", open.paid_at ? new Date(open.paid_at).toLocaleString("en-IN") : "—"]] as [string, string][]).map(([k, v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="font-medium">{v}</dd></div>)}
+              {([["Phone", open.phone], ["Village/Town", open.village], ["Age group", open.age_group], ["Status", open.current_status], ["Device", open.device_access], ["Experience", open.experience], ["Interests", open.interests.join(", ")], ["Goal", open.main_goal], ["Practice", open.practice_time], ["Guardian", open.guardian_name ? `${open.guardian_name} (${open.guardian_phone})` : "—"], ["Recommended", tierName(open.recommended_tier)], ["Selected", tierName(open.selected_tier)], ["Wants advice", open.wants_advice ? "Yes" : "No"], ["Consent", open.consent ? `Yes, ${new Date(open.consent_at!).toLocaleString("en-IN")}` : "No"], ["Payment", `${open.payment_status}${open.payment_verified_via ? ` (via ${open.payment_verified_via})` : ""}`], ["Registration UTR", open.upi_ref ?? "—"], ["First-month balance", `${open.course_payment_status}${open.course_amount ? ` ₹${open.course_amount / 100}` : ""}`], ["Balance UTR", open.course_upi_ref ?? "—"], ["Paid at", open.paid_at ? new Date(open.paid_at).toLocaleString("en-IN") : "—"]] as [string, string][]).map(([k, v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="font-medium">{v}</dd></div>)}
             </dl>
+            {open.payment_status === "verifying" && <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm"><span>Check ₹149 with UTR <b>{open.upi_ref}</b> in your UPI app:</span><Button size="sm" onClick={() => decide("registration", true)}>Received</Button><Button size="sm" variant="outline" onClick={() => decide("registration", false)}>Not received</Button></div>}
+            {open.course_payment_status === "verifying" && <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm"><span>Check ₹{(open.course_amount ?? 0) / 100} with UTR <b>{open.course_upi_ref}</b>:</span><Button size="sm" onClick={() => decide("course", true)}>Received</Button><Button size="sm" variant="outline" onClick={() => decide("course", false)}>Not received</Button></div>}
             <div className="mt-2 flex flex-wrap gap-2">{LEAD_STATUSES.map((l) => <Button key={l.id} size="sm" variant={open.lead_status === l.id ? "default" : "outline"} onClick={() => save({ lead_status: l.id })}>{l.label}</Button>)}</div>
             <Textarea placeholder="Private notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={5000} />
             <Button onClick={() => save({ notes })}>Save notes</Button>
