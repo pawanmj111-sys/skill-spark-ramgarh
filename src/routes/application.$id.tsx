@@ -21,7 +21,7 @@ function Waiting({ utr }: { utr?: string | null }) {
   return (
     <div className="mt-4 flex gap-2 rounded-lg border border-dashed p-3 text-left text-sm">
       <Clock className="size-5 shrink-0 text-primary" />
-      <span>Payment submitted{utr ? ` (UTR ${utr})` : ""}. The academy is checking it and will confirm soon. Wrong number? Call {ACADEMY.phone ?? "the academy"}.</span>
+      <span>Payment submitted{utr ? ` (UTR ${utr})` : ""}. The academy is checking it and will confirm soon. Wrong number? Call {ACADEMY.phone}.</span>
     </div>
   );
 }
